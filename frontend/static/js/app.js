@@ -169,6 +169,25 @@ function updateDashboard() {
             if (progressActive) progressActive.style.display = isActive ? '' : 'none';
             if (progressIdle) progressIdle.style.display = isActive ? 'none' : '';
 
+            // Stop button visibility
+            var stopBtn = document.getElementById('stop-processing-btn');
+            if (stopBtn) {
+                var stopRequested = w.stop_requested || false;
+                if (!isActive) {
+                    stopBtn.style.display = 'none';
+                    stopBtn.disabled = false;
+                    stopBtn.textContent = 'Stop Processing';
+                } else if (stopRequested) {
+                    stopBtn.style.display = '';
+                    stopBtn.disabled = true;
+                    stopBtn.textContent = 'Stopping...';
+                } else {
+                    stopBtn.style.display = '';
+                    stopBtn.disabled = false;
+                    stopBtn.textContent = 'Stop Processing';
+                }
+            }
+
             // Update progress bar (when active)
             const bar = document.getElementById('progress-bar');
             const text = document.getElementById('progress-text');
@@ -2617,6 +2636,15 @@ function scanWithContext() {
         hideAdvancedScan();
     })
     .catch(function() { showToast('Scan failed', 'error'); });
+}
+
+function stopProcessing() {
+    var btn = document.getElementById('stop-processing-btn');
+    if (btn) { btn.textContent = 'Stopping...'; btn.disabled = true; }
+    fetch('/api/scan/stop', { method: 'POST' })
+        .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function() { showToast('Stop requested — finishing current image...'); updateDashboard(); })
+        .catch(function() { showToast('Failed to stop processing', 'error'); });
 }
 
 // ── Settings: Processing Modes ──────────────────────────────

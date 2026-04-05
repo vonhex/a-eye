@@ -79,6 +79,8 @@ services:
       - "8000:8000"
     environment:
       OLLAMA_HOST: http://YOUR-OLLAMA-IP:11434
+      PUID: 1000   # Set to the UID that owns your photos directory (run: id -u)
+      PGID: 1000   # Set to the GID that owns your photos directory (run: id -g)
     volumes:
       - /path/to/your/photos:/photos        # Your photo library
       - a-eye-data:/app/data                 # Database, thumbnails, config, backups, and workspace
@@ -210,7 +212,7 @@ A-Eye is designed for home lab and LAN deployments. Here's what's in place:
 - **Upload restrictions** — file extension whitelisting (image formats only) and configurable per-file size limits
 - **SQL injection prevention** — parameterised queries throughout, with column name whitelisting as defence-in-depth
 - **XSS prevention** — HTML escaping on all user-controlled content rendered in the browser
-- **Non-root execution** — the Docker container drops to a non-root user after startup
+- **Non-root execution** — the Docker container drops to a non-root user after startup. PUID/PGID support lets you match container permissions to your host file ownership
 
 If you're exposing A-Eye through a reverse proxy, use your proxy's built-in rate limiting and TLS termination.
 
@@ -240,6 +242,17 @@ All settings are configurable through the web UI. They can also be set via envir
 | Photos Directory | `PHOTOS_DIR` | `/photos` | Container path to the photo library |
 | Data Directory | `DATA_DIR` | `/app/data` | Container path for database, thumbnails, and config |
 | Workspace Directory | `WORKSPACE_DIR` | *(empty)* | Custom workspace path. Defaults to `DATA_DIR/workspace` |
+
+### User / Group Identity
+
+| Setting | Env Var | Default | Description |
+|---------|---------|---------|-------------|
+| User ID | `PUID` | `99` | UID the container runs as. Default 99 matches Unraid's `nobody` user |
+| Group ID | `PGID` | `100` | GID the container runs as. Default 100 matches Unraid's `users` group |
+
+**Unraid users** can leave the defaults — `99:100` (`nobody:users`) matches how Unraid manages file ownership, so A-Eye can read and write to your photo library and appdata without permission issues.
+
+**Docker Compose users** on other Linux systems should set `PUID` and `PGID` to match the owner of your photos directory. Run `id -u` and `id -g` to find your values, or check with `ls -ln /path/to/photos`. The photos directory needs to be **readable** by the PUID/PGID user for scanning, and **writable** if you want to use rename or XMP sidecar features.
 
 ### Rename Behaviour
 

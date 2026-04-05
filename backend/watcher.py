@@ -37,6 +37,7 @@ class FileWatcher:
         self._task: asyncio.Task | None = None
         self._stop_event: asyncio.Event = asyncio.Event()
         self._scan_in_progress = False
+        self._scan_stop_requested = False
         self._last_scan_new = 0
         self._last_scan_skipped = 0
 
@@ -47,6 +48,10 @@ class FileWatcher:
     @property
     def scan_in_progress(self) -> bool:
         return self._scan_in_progress
+
+    def request_scan_stop(self) -> None:
+        """Abort any in-progress directory scan."""
+        self._scan_stop_requested = True
 
     async def start(self) -> None:
         """Start the watch loop."""
@@ -78,6 +83,7 @@ class FileWatcher:
 
         Returns (new_count, skipped_count, new_image_ids).
         """
+        self._scan_stop_requested = False
         self._scan_in_progress = True
         try:
             return await self._scan()
@@ -225,6 +231,9 @@ class FileWatcher:
         photos_resolved = photos_dir.resolve()
 
         for file_path in files:
+            if self._scan_stop_requested:
+                logger.info("Scan aborted by stop request — found %d new images so far", len(new_ids))
+                break
             if not file_path.is_file():
                 continue
             # Skip symlinks to prevent escaping the photos directory

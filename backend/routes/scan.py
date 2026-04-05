@@ -42,6 +42,26 @@ async def trigger_scan(request: Request):
     return {"status": "started", "message": "Scan started" + (" with context" if context else "")}
 
 
+@router.post("/scan/stop")
+async def stop_processing(request: Request):
+    """Stop all active processing gracefully."""
+    worker = request.app.state.worker
+    watcher = request.app.state.watcher
+    workspace = getattr(request.app.state, "workspace", None)
+
+    # Abort scan discovery if running
+    watcher.request_scan_stop()
+
+    # Drain worker queue and stop picking up new images
+    drained = worker.request_stop()
+
+    # Stop workspace processing too
+    if workspace and workspace.is_processing:
+        workspace.request_stop()
+
+    return {"stopped": True, "drained": drained}
+
+
 @router.get("/scan/status")
 async def scan_status(request: Request):
     """Current scan progress."""
@@ -90,6 +110,7 @@ async def dashboard_status(request: Request):
             "pending": worker.pending_count,
             "processed": worker.processed_count,
             "errors": worker.error_count,
+            "stop_requested": worker.stop_requested,
         },
         "scanning": watcher.scan_in_progress,
         "schedule": schedule_status,

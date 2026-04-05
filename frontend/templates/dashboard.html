@@ -74,7 +74,10 @@ if (sessionStorage.getItem('splash_shown')) {
 
 <!-- Processing Progress (active) -->
 <div class="card" id="progress-active" style="display: none;">
-    <h3>Processing Progress</h3>
+    <div class="progress-header">
+        <h3>Processing Progress</h3>
+        <button class="btn btn-sm btn-stop" id="stop-processing-btn" onclick="stopProcessing()">Stop Processing</button>
+    </div>
     <div class="progress-bar-container">
         <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
     </div>

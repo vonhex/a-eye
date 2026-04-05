@@ -63,6 +63,10 @@ class Workspace:
     def is_processing(self) -> bool:
         return self._processing
 
+    def request_stop(self) -> None:
+        """Stop workspace processing after current image finishes."""
+        self._processing = False
+
     async def init(self) -> None:
         """Create workspace directory and database if they don't exist."""
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
@@ -148,7 +152,7 @@ class Workspace:
             return
         self._processing = True
         try:
-            while True:
+            while self._processing:
                 # Fetch next pending image
                 pending = await list_images(self.db, status="pending", limit=1, sort="id", sort_dir="asc")
                 if not pending:

@@ -231,6 +231,14 @@ a.stat-card-link:hover { border-color: var(--primary); }
 }
 
 /* ── Progress Bar ──────────────────────────────────────────── */
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+.progress-header h3 { margin: 0; }
+
 .progress-bar-container {
     width: 100%;
     height: 20px;
@@ -407,6 +415,10 @@ th.sortable .sort-arrow {
 .btn-error.destructive-disabled { opacity: 0.4; cursor: pointer; }
 
 .btn-muted { color: var(--text-muted); }
+
+.btn-stop { background: var(--error); border-color: var(--error); color: #fff; }
+.btn-stop:hover { background: #d44; }
+.btn-stop:disabled { opacity: 0.6; cursor: not-allowed; background: var(--error); }
 
 .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
 .btn-xs { padding: 0.2rem 0.5rem; font-size: 0.75rem; }

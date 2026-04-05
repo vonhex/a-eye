@@ -569,7 +569,9 @@ async def _do_rename(
 
     # Validate the final path is still within photos_dir
     resolved_new = new_path.resolve()
-    if not str(resolved_new).startswith(str(photos_dir.resolve())):
+    try:
+        resolved_new.relative_to(photos_dir.resolve())
+    except ValueError:
         raise HTTPException(403, "Access denied")
 
     if settings.dry_run:

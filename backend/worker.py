@@ -42,6 +42,7 @@ class WorkerQueue:
         self._error_count = 0
         self._resume_event: asyncio.Event = asyncio.Event()
         self._resume_event.set()  # Start unpaused
+        self._stop_requested = False
 
     @property
     def pending_count(self) -> int:
@@ -63,6 +64,10 @@ class WorkerQueue:
     def is_paused(self) -> bool:
         return not self._resume_event.is_set()
 
+    @property
+    def stop_requested(self) -> bool:
+        return self._stop_requested
+
     def pause(self) -> None:
         """Pause processing — workers finish current image then wait."""
         self._resume_event.clear()
@@ -72,6 +77,28 @@ class WorkerQueue:
         """Resume processing."""
         self._resume_event.set()
         logger.info("Worker queue resumed")
+
+    def request_stop(self) -> int:
+        """Signal workers to stop after finishing their current image.
+
+        Drains the queue — pending images stay as 'pending' in DB.
+        Returns the number of queued items drained.
+        """
+        self._stop_requested = True
+        drained = 0
+        while not self._queue.empty():
+            try:
+                self._queue.get_nowait()
+                self._queue.task_done()
+                drained += 1
+            except asyncio.QueueEmpty:
+                break
+        logger.info("Stop requested — drained %d queued images", drained)
+        return drained
+
+    def clear_stop(self) -> None:
+        """Clear the stop flag so new work can be enqueued."""
+        self._stop_requested = False
 
     async def start(self) -> None:
         """Start worker coroutines."""
@@ -98,6 +125,7 @@ class WorkerQueue:
 
     async def enqueue(self, image_ids: list[int]) -> int:
         """Add image IDs to the processing queue. Returns count enqueued."""
+        self._stop_requested = False  # Clear any previous stop
         count = 0
         for image_id in image_ids:
             await self._queue.put(image_id)
@@ -123,6 +151,10 @@ class WorkerQueue:
 
             if image_id == -1:  # Sentinel for shutdown
                 break
+
+            if self._stop_requested:
+                self._queue.task_done()
+                continue
 
             try:
                 await self._process_one(image_id, worker_id)
