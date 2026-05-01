@@ -123,6 +123,24 @@ class WorkerQueue:
         self._tasks.clear()
         logger.info("Workers stopped")
 
+    async def resize(self, new_count: int) -> None:
+        """Stop all workers and restart with new_count — called when the setting changes."""
+        if new_count == len(self._tasks):
+            return
+        self._running = False
+        self._resume_event.set()
+        for _ in self._tasks:
+            await self._queue.put(-1)
+        for task in self._tasks:
+            task.cancel()
+        await asyncio.gather(*self._tasks, return_exceptions=True)
+        self._tasks.clear()
+        self._running = True
+        for i in range(new_count):
+            task = asyncio.create_task(self._worker_loop(i))
+            self._tasks.append(task)
+        logger.info("Worker pool resized to %d", new_count)
+
     async def enqueue(self, image_ids: list[int]) -> int:
         """Add image IDs to the processing queue. Returns count enqueued."""
         self._stop_requested = False  # Clear any previous stop

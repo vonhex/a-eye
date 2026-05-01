@@ -91,6 +91,8 @@ async def _apply_settings_update(request: Request, body: SettingsUpdate):
 
     # Update worker, watcher, scheduler, and workspace references
     request.app.state.worker.settings = new_settings
+    if "concurrent_workers" in updates:
+        await request.app.state.worker.resize(new_settings.concurrent_workers)
     request.app.state.watcher.settings = new_settings
     scheduler = getattr(request.app.state, "scheduler", None)
     if scheduler:

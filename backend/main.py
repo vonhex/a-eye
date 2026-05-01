@@ -79,6 +79,17 @@ async def lifespan(app: FastAPI):
     app.state.worker = worker
     await worker.start()
 
+    # Reset any images that were mid-flight when the app last stopped, then
+    # re-enqueue all pending images so they aren't stuck after a restart.
+    await db.execute("UPDATE images SET status = 'pending' WHERE status = 'processing'")
+    await db.commit()
+    cursor = await db.execute("SELECT id FROM images WHERE status = 'pending'")
+    pending_rows = await cursor.fetchall()
+    pending_ids = [row[0] for row in pending_rows]
+    if pending_ids:
+        await worker.enqueue(pending_ids)
+        logger.info("Re-enqueued %d pending image(s) from previous session", len(pending_ids))
+
     # File watcher
     watcher = FileWatcher(db=db, settings=settings, worker=worker)
     app.state.watcher = watcher
