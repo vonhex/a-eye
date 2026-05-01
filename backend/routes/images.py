@@ -282,6 +282,20 @@ async def api_process_batch(request: Request, body: BatchProcessRequest):
     return {"status": "enqueued", "count": count}
 
 
+@router.post("/images/retry-all-errors")
+async def api_retry_all_errors(request: Request):
+    """Reset all error images to pending and enqueue them for reprocessing."""
+    db = request.app.state.db
+    await db.execute("UPDATE images SET status = 'pending', error_message = NULL WHERE status = 'error'")
+    await db.commit()
+    cursor = await db.execute("SELECT id FROM images WHERE status = 'pending'")
+    rows = await cursor.fetchall()
+    ids = [row[0] for row in rows]
+    worker = request.app.state.worker
+    count = await worker.enqueue(ids)
+    return {"status": "enqueued", "count": count}
+
+
 @router.post("/images/download-batch")
 async def api_download_batch(request: Request, body: BatchDownloadRequest):
     """Generate a zip file containing selected images and stream it."""

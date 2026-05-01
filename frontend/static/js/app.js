@@ -2661,6 +2661,17 @@ function resumeProcessing() {
         .catch(function() { showToast('Failed to resume processing', 'error'); });
 }
 
+function retryAllErrors() {
+    var prefix = (typeof API_PREFIX !== 'undefined' ? API_PREFIX : '/api');
+    fetch(prefix + '/images/retry-all-errors', { method: 'POST' })
+        .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function(data) {
+            showToast('Retrying ' + (data.count || 0) + ' error image(s)');
+            setTimeout(function() { window.location.reload(); }, 600);
+        })
+        .catch(function() { showToast('Failed to retry errors', 'error'); });
+}
+
 // ── Settings: Processing Modes ──────────────────────────────
 
 function toggleCatalogueMode() {
