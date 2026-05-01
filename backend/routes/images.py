@@ -21,6 +21,7 @@ from backend.database import (
     delete_all_history,
     delete_reverted_history,
     get_image,
+    get_image_path,
     get_rename_history,
     insert_rename_history,
     list_images,
@@ -167,12 +168,14 @@ async def api_get_image(request: Request, image_id: int):
 async def api_get_thumbnail(request: Request, image_id: int):
     db = request.app.state.db
     settings = request.app.state.settings
-    image = await get_image(db, image_id)
-    if not image:
+
+    # Only fetch the file_path — no need to load the full image row
+    file_path = await get_image_path(db, image_id)
+    if not file_path:
         raise HTTPException(404, "Image not found")
 
     photos_dir = Path(settings.photos_dir)
-    source_path = _safe_path(photos_dir, image["file_path"])
+    source_path = _safe_path(photos_dir, file_path)
     if not source_path.exists():
         raise HTTPException(404, "Source image not found")
 
@@ -184,7 +187,11 @@ async def api_get_thumbnail(request: Request, image_id: int):
     if not thumb:
         raise HTTPException(500, "Failed to generate thumbnail")
 
-    return FileResponse(thumb, media_type="image/jpeg")
+    return FileResponse(
+        thumb,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "max-age=86400, immutable"},
+    )
 
 
 @router.get("/images/{image_id}/file")

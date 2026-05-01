@@ -605,7 +605,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // Dashboard page: start live polling + init upload/workspace
     if (document.getElementById('stat-total')) {
         updateDashboard();
-        setInterval(updateDashboard, 5000);
+        // Poll fast (5s) while active, slow (15s) when idle to reduce DB load
+        var _dashInterval = null;
+        function _scheduleDashPoll(active) {
+            if (_dashInterval) clearInterval(_dashInterval);
+            _dashInterval = setInterval(function() {
+                var wasActive = (document.getElementById('progress-active') || {}).style &&
+                    document.getElementById('progress-active').style.display !== 'none';
+                updateDashboard();
+                _scheduleDashPoll(wasActive);
+            }, active ? 5000 : 15000);
+        }
+        _scheduleDashPoll(false);
 
         // Library upload drop zone
         initUploadDropZone('upload-drop-zone', 'upload-file-input', function(files) {

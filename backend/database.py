@@ -75,6 +75,15 @@ async def init_db(db_path: str) -> aiosqlite.Connection:
     """Open (or create) the SQLite database and ensure tables exist."""
     db = await aiosqlite.connect(db_path)
     db.row_factory = aiosqlite.Row
+
+    # WAL mode: readers never block writers and vice versa — critical for
+    # concurrent dashboard polling + background worker writes.
+    await db.execute("PRAGMA journal_mode=WAL")
+    await db.execute("PRAGMA synchronous=NORMAL")   # safe with WAL, much faster
+    await db.execute("PRAGMA cache_size=-32000")    # 32 MB page cache
+    await db.execute("PRAGMA temp_store=MEMORY")
+    await db.commit()
+
     await db.executescript(_SCHEMA)
     await db.commit()
 
@@ -184,6 +193,13 @@ async def get_image(db: aiosqlite.Connection, image_id: int) -> dict | None:
     if row is None:
         return None
     return _row_to_dict(row)
+
+
+async def get_image_path(db: aiosqlite.Connection, image_id: int) -> str | None:
+    """Fetch only the file_path for an image — fast path for thumbnail serving."""
+    cursor = await db.execute("SELECT file_path FROM images WHERE id = ?", (image_id,))
+    row = await cursor.fetchone()
+    return row[0] if row else None
 
 
 async def get_image_by_hash(db: aiosqlite.Connection, file_hash: str) -> dict | None:
