@@ -42,6 +42,23 @@ async def trigger_scan(request: Request):
     return {"status": "started", "message": "Scan started" + (" with context" if context else "")}
 
 
+@router.post("/scan/resume")
+async def resume_processing(request: Request):
+    """Clear the stop flag and re-enqueue any pending images."""
+    worker = request.app.state.worker
+    db = request.app.state.db
+
+    worker.clear_stop()
+
+    cursor = await db.execute("SELECT id FROM images WHERE status = 'pending'")
+    rows = await cursor.fetchall()
+    pending_ids = [row[0] for row in rows]
+    if pending_ids:
+        await worker.enqueue(pending_ids)
+
+    return {"resumed": True, "enqueued": len(pending_ids)}
+
+
 @router.post("/scan/stop")
 async def stop_processing(request: Request):
     """Stop all active processing gracefully."""

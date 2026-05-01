@@ -161,6 +161,9 @@ function updateDashboard() {
                 _setText('review-count', proposed);
             }
 
+            // Worker data needed below
+            const w = data.worker || {};
+
             // Toggle idle/active progress sections
             const p = data.progress || {};
             var isActive = (stats.pending || 0) + (stats.processing || 0) > 0;
@@ -169,7 +172,7 @@ function updateDashboard() {
             if (progressActive) progressActive.style.display = isActive ? '' : 'none';
             if (progressIdle) progressIdle.style.display = isActive ? 'none' : '';
 
-            // Stop button visibility
+            // Stop / Resume button
             var stopBtn = document.getElementById('stop-processing-btn');
             if (stopBtn) {
                 var stopRequested = w.stop_requested || false;
@@ -177,14 +180,17 @@ function updateDashboard() {
                     stopBtn.style.display = 'none';
                     stopBtn.disabled = false;
                     stopBtn.textContent = 'Stop Processing';
+                    stopBtn.onclick = stopProcessing;
                 } else if (stopRequested) {
                     stopBtn.style.display = '';
-                    stopBtn.disabled = true;
-                    stopBtn.textContent = 'Stopping...';
+                    stopBtn.disabled = false;
+                    stopBtn.textContent = 'Resume Processing';
+                    stopBtn.onclick = resumeProcessing;
                 } else {
                     stopBtn.style.display = '';
                     stopBtn.disabled = false;
                     stopBtn.textContent = 'Stop Processing';
+                    stopBtn.onclick = stopProcessing;
                 }
             }
 
@@ -224,7 +230,6 @@ function updateDashboard() {
             updateScheduleStatus(data);
 
             // Update worker status
-            const w = data.worker || {};
             var workerLabel = w.running ? 'Active' : 'Stopped';
             if (w.paused) workerLabel = 'Paused (scheduled)';
             _setText('worker-running', workerLabel);
@@ -2645,6 +2650,15 @@ function stopProcessing() {
         .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
         .then(function() { showToast('Stop requested — finishing current image...'); updateDashboard(); })
         .catch(function() { showToast('Failed to stop processing', 'error'); });
+}
+
+function resumeProcessing() {
+    var btn = document.getElementById('stop-processing-btn');
+    if (btn) { btn.textContent = 'Resuming...'; btn.disabled = true; }
+    fetch('/api/scan/resume', { method: 'POST' })
+        .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function() { showToast('Processing resumed'); updateDashboard(); })
+        .catch(function() { showToast('Failed to resume processing', 'error'); });
 }
 
 // ── Settings: Processing Modes ──────────────────────────────
