@@ -21,8 +21,10 @@ from backend.database import (
     delete_all_history,
     delete_reverted_history,
     get_image,
+    get_image_by_path,
     get_image_path,
     get_rename_history,
+    insert_image,
     insert_rename_history,
     list_images,
     mark_image_history_reverted,
@@ -301,6 +303,56 @@ async def api_retry_all_errors(request: Request):
     worker = request.app.state.worker
     count = await worker.enqueue(ids)
     return {"status": "enqueued", "count": count}
+
+
+@router.post("/analyze-path")
+async def api_analyze_path(request: Request):
+    """Accept an image by relative path, register it if unknown, and enqueue for AI analysis.
+
+    Called by Eyeris to delegate analysis of untagged images to A-Eye.
+    The path must be relative to A-Eye's photos directory.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "JSON body required")
+
+    rel_path = (body.get("path") or "").strip().lstrip("/")
+    if not rel_path:
+        raise HTTPException(400, "path is required")
+
+    settings = request.app.state.settings
+    photos_dir = Path(settings.photos_dir)
+    full_path = _safe_path(photos_dir, rel_path)
+
+    if not full_path.is_file():
+        raise HTTPException(404, f"File not found: {rel_path}")
+
+    db = request.app.state.db
+    image = await get_image_by_path(db, rel_path)
+
+    if image:
+        image_id = image["id"]
+        await update_image(db, image_id, status="pending", error_message=None)
+    else:
+        from backend.database import compute_file_hash
+        try:
+            file_hash = compute_file_hash(full_path)
+        except Exception:
+            file_hash = None
+        image_id = await insert_image(
+            db,
+            file_path=rel_path,
+            original_filename=full_path.name,
+            current_filename=full_path.name,
+            file_hash=file_hash,
+            file_size=full_path.stat().st_size,
+            status="pending",
+        )
+
+    worker = request.app.state.worker
+    await worker.enqueue([image_id])
+    return {"status": "enqueued", "image_id": image_id, "path": rel_path}
 
 
 @router.post("/images/download-batch")
