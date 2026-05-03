@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -306,11 +306,16 @@ async def api_retry_all_errors(request: Request):
 
 
 @router.post("/analyze-image")
-async def api_analyze_image(request: Request, file: UploadFile = File(...)):
+async def api_analyze_image(
+    request: Request,
+    file: UploadFile = File(...),
+    context: str | None = Form(None),
+):
     """Analyze image bytes directly and return tags + description as JSON.
 
     No file is stored and no DB record is created. Used by Eyeris to analyze
     video thumbnails without putting the video itself through A-Eye's pipeline.
+    Optional `context` form field steers the vision prompt (e.g. face analysis).
     """
     ollama = request.app.state.ollama
     if not ollama or not ollama.vision_model:
@@ -322,7 +327,7 @@ async def api_analyze_image(request: Request, file: UploadFile = File(...)):
 
     try:
         description, tags, quality_flags = await ollama.describe_image_bytes(
-            image_bytes, include_tags=True
+            image_bytes, include_tags=(context is None), processing_context=context
         )
     except Exception as exc:
         raise HTTPException(500, f"Analysis failed: {exc}")
