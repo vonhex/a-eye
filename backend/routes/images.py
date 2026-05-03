@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -303,6 +303,31 @@ async def api_retry_all_errors(request: Request):
     worker = request.app.state.worker
     count = await worker.enqueue(ids)
     return {"status": "enqueued", "count": count}
+
+
+@router.post("/analyze-image")
+async def api_analyze_image(request: Request, file: UploadFile = File(...)):
+    """Analyze image bytes directly and return tags + description as JSON.
+
+    No file is stored and no DB record is created. Used by Eyeris to analyze
+    video thumbnails without putting the video itself through A-Eye's pipeline.
+    """
+    ollama = request.app.state.ollama
+    if not ollama or not ollama.vision_model:
+        raise HTTPException(503, "Vision model not configured")
+
+    image_bytes = await file.read()
+    if not image_bytes:
+        raise HTTPException(400, "Empty file")
+
+    try:
+        description, tags, quality_flags = await ollama.describe_image_bytes(
+            image_bytes, include_tags=True
+        )
+    except Exception as exc:
+        raise HTTPException(500, f"Analysis failed: {exc}")
+
+    return {"description": description, "tags": tags, "quality_flags": quality_flags}
 
 
 @router.post("/analyze-path")

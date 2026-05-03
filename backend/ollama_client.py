@@ -160,6 +160,41 @@ class OllamaClient:
 
     # -- Vision (describe + name) -------------------------------------------
 
+    async def describe_image_bytes(
+        self,
+        image_bytes: bytes,
+        include_tags: bool = True,
+        processing_context: str | None = None,
+    ) -> tuple[str, list[str], list[str]]:
+        """Analyze raw image bytes without a file on disk.
+
+        Used by the /api/analyze-image endpoint so callers can send image data
+        directly (e.g. video thumbnails from Eyeris).
+        Returns (description, tags, quality_flags).
+        """
+        from backend.prompts import render_vision_prompt, DEFAULT_VISION_PROMPT, DEFAULT_CONTEXT_TEMPLATE
+
+        vision_tmpl = self._vision_template or DEFAULT_VISION_PROMPT
+        context_tmpl = self._context_template or DEFAULT_CONTEXT_TEMPLATE
+
+        prompt = render_vision_prompt(
+            vision_tmpl,
+            context_tmpl,
+            metadata_text="",
+            include_tags=include_tags,
+            processing_context=processing_context,
+        )
+
+        image_b64 = _encode_image_bytes(image_bytes)
+        raw = await self._generate(
+            model=self.vision_model,
+            prompt=prompt,
+            images=[image_b64],
+        )
+
+        parsed = _parse_response(raw)
+        return parsed["description"], parsed["tags"], parsed["quality_flags"]
+
     async def describe_and_name_image(
         self,
         image_path: Path,
@@ -199,6 +234,16 @@ class OllamaClient:
 
 
 # -- Helpers -----------------------------------------------------------------
+
+
+def _encode_image_bytes(image_bytes: bytes) -> str:
+    """Encode raw image bytes as a base64 JPEG for the vision model."""
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    if max(img.size) > _VISION_MAX_PX:
+        img.thumbnail((_VISION_MAX_PX, _VISION_MAX_PX), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=_VISION_JPEG_QUALITY)
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
 def _encode_image(image_path: Path) -> str:
