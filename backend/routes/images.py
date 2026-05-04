@@ -335,6 +335,66 @@ async def api_analyze_image(
     return {"description": description, "tags": tags, "quality_flags": quality_flags}
 
 
+_FACE_DETECTION_PROMPT = """Look at this image. List each distinct person you can see.
+
+For each person write exactly one line starting with PERSON: followed by a brief description.
+Format: PERSON: gender, age range, hair description, any notable features (glasses, beard, etc.)
+
+Examples:
+PERSON: woman, 30s, long brown hair, glasses
+PERSON: man, 20s, short black hair, beard
+PERSON: child, around 8 years old, blonde curly hair
+
+If there are NO people visible in this image, write only: NO_PEOPLE
+
+Write ONLY the PERSON: lines or NO_PEOPLE. No other text."""
+
+
+@router.post("/analyze-faces")
+async def api_analyze_faces(
+    request: Request,
+    file: UploadFile = File(...),
+):
+    """Detect and describe each person in an image using a direct face prompt.
+
+    Bypasses the vision template pipeline so the model outputs structured
+    PERSON: lines instead of the standard DESCRIPTION:/TAGS: format.
+    Returns {"faces": [{"description": "..."}], "no_people": bool}.
+    """
+    from backend.ollama_client import _encode_image_bytes
+
+    ollama = request.app.state.ollama
+    if not ollama or not ollama.vision_model:
+        raise HTTPException(503, "Vision model not configured")
+
+    image_bytes = await file.read()
+    if not image_bytes:
+        raise HTTPException(400, "Empty file")
+
+    try:
+        image_b64 = _encode_image_bytes(image_bytes)
+        raw = await ollama._generate(
+            model=ollama.vision_model,
+            prompt=_FACE_DETECTION_PROMPT,
+            images=[image_b64],
+        )
+    except Exception as exc:
+        raise HTTPException(500, f"Analysis failed: {exc}")
+
+    faces = []
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if stripped.upper().startswith("PERSON:"):
+            desc = stripped[7:].strip()
+            if desc:
+                faces.append({"description": desc})
+
+    no_people = not faces and any(
+        p in raw.upper() for p in ("NO_PEOPLE", "NO PEOPLE", "NO PERSON", "NOBODY", "NO ONE")
+    )
+    return {"faces": faces, "no_people": no_people, "raw": raw}
+
+
 @router.post("/analyze-path")
 async def api_analyze_path(request: Request):
     """Accept an image by relative path, register it if unknown, and enqueue for AI analysis.
