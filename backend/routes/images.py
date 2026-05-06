@@ -172,6 +172,27 @@ async def api_get_image_by_path(request: Request, path: str):
     rel_path = path.lstrip("/")
     image = await get_image_by_path(db, rel_path)
     if not image:
+        # Fallback: try matching the end of the path (fuzzy match)
+        cursor = await db.execute(
+            "SELECT * FROM images WHERE file_path LIKE ? LIMIT 1",
+            (f"%{rel_path}",)
+        )
+        row = await cursor.fetchone()
+        if row:
+            from backend.database import _row_to_dict
+            image = _row_to_dict(row)
+            
+    if not image:
+        raise HTTPException(404, "Image not found")
+    return image
+
+
+@router.get("/images/by-hash/{file_hash}")
+async def api_get_image_by_hash(request: Request, file_hash: str):
+    """Fetch a single image record by its file hash."""
+    db = request.app.state.db
+    image = await get_image_by_hash(db, file_hash)
+    if not image:
         raise HTTPException(404, "Image not found")
     return image
 
