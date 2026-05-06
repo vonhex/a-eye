@@ -164,6 +164,18 @@ async def api_get_image(request: Request, image_id: int):
     return image
 
 
+@router.get("/images/by-path/{path:path}")
+async def api_get_image_by_path(request: Request, path: str):
+    """Fetch a single image record by its relative file path."""
+    db = request.app.state.db
+    # Normalize path (remove leading slash)
+    rel_path = path.lstrip("/")
+    image = await get_image_by_path(db, rel_path)
+    if not image:
+        raise HTTPException(404, "Image not found")
+    return image
+
+
 # -- Thumbnails --------------------------------------------------------------
 
 @router.get("/images/{image_id}/thumbnail")
