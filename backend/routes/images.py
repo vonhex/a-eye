@@ -191,11 +191,14 @@ async def api_get_image_by_path(request: Request, path: str):
 @router.get("/images/by-hash/{file_hash}")
 async def api_get_image_by_hash(request: Request, file_hash: str):
     """Fetch a single image record by its file hash."""
-    db = request.app.state.db
-    image = await get_image_by_hash(db, file_hash)
-    if not image:
-        raise HTTPException(404, "Image not found")
-    return image
+    try:
+        db = request.app.state.db
+        image = await get_image_by_hash(db, file_hash)
+        if not image:
+            raise HTTPException(404, "Image not found")
+        return image
+    except Exception as e:
+        return JSONResponse({"error": str(e), "type": type(e).__name__}, status_code=500)
 
 
 # -- Thumbnails --------------------------------------------------------------
