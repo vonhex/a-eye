@@ -17,10 +17,12 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 from backend.database import (
+    _row_to_dict,
     count_images,
     delete_all_history,
     delete_reverted_history,
     get_image,
+    get_image_by_hash,
     get_image_by_path,
     get_image_path,
     get_rename_history,
@@ -179,7 +181,6 @@ async def api_get_image_by_path(request: Request, path: str):
         )
         row = await cursor.fetchone()
         if row:
-            from backend.database import _row_to_dict
             image = _row_to_dict(row)
             
     if not image:
