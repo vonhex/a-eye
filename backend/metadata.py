@@ -123,7 +123,7 @@ async def extract_metadata(file_path: Path) -> MetadataResult:
 
     try:
         with open(file_path, "rb") as f:
-            tags = exifread.process_file(f, details=False)
+            tags = exifread.process_file(f, details=True)
     except Exception:
         logger.warning("exifread failed for %s", file_path, exc_info=True)
 
