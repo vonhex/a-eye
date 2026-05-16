@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from PIL import Image as _PilImage
+
 from backend.config import Settings
 from backend.confidence import score_confidence
 from backend.filename import render_template, sanitize_filename
@@ -60,6 +62,23 @@ async def process_image(
     }
 
     # ── Stage 2: Vision ──────────────────────────────────────────────────
+
+    # Skip images that are too small for meaningful vision analysis.
+    # Tiny files are usually app-generated thumbnails (e.g. Nextcloud appdata previews)
+    # that cause vision models to return 500 errors.
+    _MIN_VISION_PX = 100
+    try:
+        with _PilImage.open(file_path) as _img:
+            _w, _h = _img.size
+        if min(_w, _h) < _MIN_VISION_PX:
+            logger.info(
+                "Skipping vision analysis for %s: image too small (%dx%d px)",
+                file_path, _w, _h,
+            )
+            result.error = f"Image too small ({_w}×{_h}px) — skipped"
+            return result
+    except Exception:
+        pass  # Let the vision call handle any open errors
 
     try:
         description, suggested_name, tags, quality_flags = await ollama.describe_and_name_image(
