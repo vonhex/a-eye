@@ -154,7 +154,17 @@ class OllamaClient:
             json=payload,
             timeout=_GENERATE_TIMEOUT,
         )
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            try:
+                body = resp.json()
+                ollama_error = body.get("error", resp.text)
+            except Exception:
+                ollama_error = resp.text or f"HTTP {resp.status_code}"
+            raise httpx.HTTPStatusError(
+                f"Ollama error: {ollama_error}",
+                request=resp.request,
+                response=resp,
+            )
         data = resp.json()
         return data.get("response", "").strip()
 
