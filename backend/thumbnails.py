@@ -7,6 +7,7 @@ from pathlib import Path
 from PIL import Image
 
 from backend.image_io import open_image
+from backend.pathsafe import confine
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ async def get_or_create_thumbnail(
     thumbs_dir = data_dir / "thumbnails"
     thumbs_dir.mkdir(parents=True, exist_ok=True)
 
-    thumb_path = thumbs_dir / f"{image_id}.jpg"
+    thumb_path = confine(thumbs_dir, f"{int(image_id)}.jpg")
 
     if thumb_path.exists():
         return thumb_path

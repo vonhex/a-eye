@@ -14,6 +14,7 @@ from backend.filename import ensure_unique
 from backend.preview import display_response, viewer_page
 from backend.thumbnails import get_or_create_thumbnail
 from backend.watcher import IMAGE_EXTENSIONS
+from backend.pathsafe import confine
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +31,10 @@ def _get_workspace(request: Request):
 
 def _safe_path(base: Path, relative: str) -> Path:
     """Resolve a relative path against a base directory and verify it stays within bounds."""
-    full = (base / relative).resolve()
     try:
-        full.relative_to(base.resolve())
+        return confine(base, relative)
     except ValueError:
         raise HTTPException(403, "Access denied")
-    return full
 
 
 class BatchIdsRequest(BaseModel):
@@ -222,8 +221,12 @@ async def workspace_approve_batch(request: Request, body: BatchIdsRequest):
         try:
             result = await ws.approve_image(image_id)
             results.append({"id": image_id, **result})
-        except (ValueError, OSError) as exc:
+        except ValueError as exc:
+            # ValueErrors carry our own user-facing messages (e.g. name already exists)
             results.append({"id": image_id, "error": str(exc)})
+        except OSError:
+            logger.exception("Approving workspace image %d failed", image_id)
+            results.append({"id": image_id, "error": "File operation failed"})
     return {"results": results}
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from backend.pathsafe import confine
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -87,13 +88,8 @@ async def create_folder(request: Request, body: CreateFolderRequest):
         raise HTTPException(400, "Folder name contains invalid characters")
 
     parent = body.parent.strip().strip("/")
-    if parent and parent != ".":
-        target = (photos_dir / parent / name).resolve()
-    else:
-        target = (photos_dir / name).resolve()
-
     try:
-        target.relative_to(photos_dir.resolve())
+        target = confine(photos_dir, parent, name) if parent and parent != "." else confine(photos_dir, name)
     except ValueError:
         raise HTTPException(400, "Invalid folder path")
 

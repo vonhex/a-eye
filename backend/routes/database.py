@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from fastapi.responses import FileResponse
 
 from backend.watcher import IMAGE_EXTENSIONS
+from backend.pathsafe import confine
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +32,8 @@ def _validate_backup_filename(filename: str, backups: Path) -> Path:
     """Validate a backup filename and return the full path. Raises 404/400."""
     if not filename.endswith(".db"):
         raise HTTPException(400, "Invalid backup file")
-    path = (backups / filename).resolve()
     try:
-        path.relative_to(backups.resolve())
+        path = confine(backups, filename)
     except ValueError:
         raise HTTPException(400, "Invalid filename")
     if not path.exists():

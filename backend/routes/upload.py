@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
 
 from backend.filename import ensure_unique
 from backend.watcher import IMAGE_EXTENSIONS
+from backend.pathsafe import confine
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +32,8 @@ async def api_upload(
 
     # Resolve subfolder safely
     if subfolder:
-        dest_dir = (photos_dir / subfolder).resolve()
         try:
-            dest_dir.relative_to(photos_dir.resolve())
+            dest_dir = confine(photos_dir, subfolder)
         except ValueError:
             raise HTTPException(400, "Invalid subfolder path")
         dest_dir.mkdir(parents=True, exist_ok=True)

@@ -134,9 +134,9 @@ async def api_trash_batch(request: Request, body: TrashBatchRequest):
             results.append(result)
         except HTTPException as exc:
             results.append({"image_id": image_id, "status": "error", "error": exc.detail})
-        except Exception as exc:
+        except Exception:
             logger.error("Failed to trash image %d", image_id, exc_info=True)
-            results.append({"image_id": image_id, "status": "error", "error": str(exc)})
+            results.append({"image_id": image_id, "status": "error", "error": "Could not move to trash"})
 
     trashed_count = sum(1 for r in results if r.get("status") == "trashed")
     return {"results": results, "trashed": trashed_count}

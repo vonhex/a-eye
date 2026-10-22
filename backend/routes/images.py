@@ -36,6 +36,7 @@ from backend.filename import ensure_unique, sanitize_filename
 from backend.preview import display_response, viewer_page
 from backend.thumbnails import get_or_create_thumbnail
 from backend.xmp_writer import rename_xmp_sidecar
+from backend.pathsafe import confine
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +47,10 @@ router = APIRouter()
 
 def _safe_path(base: Path, relative: str) -> Path:
     """Resolve a relative path against a base directory and verify it stays within bounds."""
-    full = (base / relative).resolve()
     try:
-        full.relative_to(base.resolve())
+        return confine(base, relative)
     except ValueError:
         raise HTTPException(403, "Access denied")
-    return full
 
 
 def _require_writable(request: Request) -> None:
@@ -197,8 +196,11 @@ async def api_get_image_by_hash(request: Request, file_hash: str):
         if not image:
             raise HTTPException(404, "Image not found")
         return image
-    except Exception as e:
-        return JSONResponse({"error": str(e), "type": type(e).__name__}, status_code=500)
+    except HTTPException:
+        raise  # keep the 404: Eyeris treats it as "not analysed yet"
+    except Exception:
+        logger.exception("by-hash lookup failed for %s", file_hash)
+        return JSONResponse({"error": "Lookup failed"}, status_code=500)
 
 
 # -- Thumbnails --------------------------------------------------------------

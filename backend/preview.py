@@ -61,7 +61,7 @@ img.zoomed {{ max-width:none; max-height:none; cursor:zoom-out; }}
 </style>
 </head><body>
 <button class="close" onclick="window.close()" title="Close">&times;</button>
-<img src="{file_url}" alt="{filename}" onclick="this.classList.toggle('zoomed')">
+<img src="{html.escape(file_url, quote=True)}" alt="{filename}" onclick="this.classList.toggle('zoomed')">
 <script>document.addEventListener('keydown',function(e){{ if(e.key==='Escape')window.close(); }});</script>
 </body></html>"""
     return HTMLResponse(page)
