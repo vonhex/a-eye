@@ -151,12 +151,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         # Allow wizard, login page, and essential API endpoints without auth
         skip_exact = ("/api/health", "/api/models", "/api/onboard/settings", "/login", "/api/login")
-        skip_prefix = (
-            "/onboard", 
-            "/static/", 
-            "/api/images/by-path", 
-            "/api/images/by-hash"
-        )
+        # by-path / by-hash return GPS, EXIF and paths, so they need auth too;
+        # Eyeris sends its A-Eye username and password with these lookups.
+        skip_prefix = ("/onboard", "/static/")
         path = request.url.path
         if path in skip_exact or any(path.startswith(p) for p in skip_prefix):
             return await call_next(request)

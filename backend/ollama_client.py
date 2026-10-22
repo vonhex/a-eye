@@ -119,7 +119,8 @@ class OllamaClient:
         """
         import json as _json
 
-        async with httpx.AsyncClient(timeout=None) as client:
+        # No read limit (pulls can take a long time), but fail fast if the server is unreachable
+        async with httpx.AsyncClient(timeout=httpx.Timeout(None, connect=10.0)) as client:
             async with client.stream(
                 "POST",
                 f"{self.host}/api/pull",
