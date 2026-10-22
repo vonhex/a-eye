@@ -2784,7 +2784,7 @@ function saveSettings() {
 
     const settings = {};
     const fields = [
-        'ollama_host', 'vision_model', 'llm_model', 'output_language',
+        'ai_api', 'ollama_host', 'ai_disable_thinking', 'vision_model', 'llm_model', 'output_language',
         'catalogue_mode',
         'process_rename', 'process_write_description', 'process_write_tags',
         'filename_template', 'filename_case', 'max_filename_len',
@@ -2804,6 +2804,10 @@ function saveSettings() {
         const v = getValue(f);
         if (v !== undefined) settings[f] = v;
     });
+
+    // API key is write-only: only send it when a new one was typed
+    const apiKey = document.getElementById('ai_api_key');
+    if (apiKey && apiKey.value.trim()) settings['ai_api_key'] = apiKey.value.trim();
 
     // Handle rename_mode radio group
     const modeEl = document.querySelector('input[name="rename_mode"]:checked');

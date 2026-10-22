@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 from backend.config import Settings
-from backend.ollama_client import OllamaClient
+from backend.ollama_client import make_ai_client
 from backend.pipeline import process_image
 
 
@@ -66,11 +66,7 @@ def main() -> None:
 
 
 async def _run(image_path: Path, settings: Settings) -> None:
-    ollama = OllamaClient(
-        host=settings.ollama_host,
-        vision_model=settings.vision_model,
-        llm_model=settings.llm_model,
-    )
+    ollama = make_ai_client(settings)
 
     try:
         # Check connection first

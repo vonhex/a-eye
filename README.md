@@ -56,6 +56,17 @@ Ollama does **not** need to be on the same machine as A-Eye. It can run on:
 
 As long as A-Eye can reach Ollama's URL over HTTP, it works.
 
+### Using an OpenAI-compatible server instead of Ollama
+
+A-Eye can also use any server that speaks the OpenAI API with image input, such as Halogen, llama.cpp (`llama-server` with an `--mmproj`), vLLM or LM Studio. In **Settings → AI Server Connection** set:
+
+- **Server Type** — *OpenAI-compatible*
+- **Server URL** — e.g. `http://192.168.1.103:8731` (with or without `/v1`)
+- **API Key** — only if your server requires one
+- **Disable thinking** — on by default; asks reasoning models (Qwen and similar) to answer directly, which makes tagging much faster
+
+Save, then **Load Models** and pick the served model as the vision model. The same options are available as environment variables: `AI_API=openai`, `OLLAMA_HOST`, `AI_API_KEY`, `AI_DISABLE_THINKING=true`. Pulling models from the UI is Ollama-only; load models on your server directly.
+
 ## Installation — Unraid
 
 1. Go to **Community Applications** in Unraid

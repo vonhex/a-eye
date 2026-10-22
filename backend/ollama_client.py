@@ -222,6 +222,121 @@ class OllamaClient:
 
 
 
+class OpenAICompatClient(OllamaClient):
+    """Same interface as OllamaClient, for OpenAI-compatible servers (Halogen, llama.cpp, vLLM...).
+
+    `host` may be given with or without the trailing /v1. Model management (pull,
+    capabilities) is not part of the OpenAI API: every served model is offered as
+    both vision and text, and pulling is reported as unsupported.
+    """
+
+    def __init__(self, host: str, vision_model: str, llm_model: str = "",
+                 api_key: str = "", disable_thinking: bool = True) -> None:
+        super().__init__(re.sub(r"/v1/?$", "", host.rstrip("/")), vision_model, llm_model)
+        self.api_base = f"{self.host}/v1"
+        self.disable_thinking = disable_thinking
+        if api_key:
+            self._client.headers["Authorization"] = f"Bearer {api_key}"
+
+    async def check_connection(self) -> bool:
+        try:
+            resp = await self._client.get(f"{self.api_base}/models")
+            return resp.status_code == 200
+        except httpx.HTTPError:
+            return False
+
+    async def list_models(self) -> list[dict[str, Any]]:
+        try:
+            resp = await self._client.get(f"{self.api_base}/models")
+            resp.raise_for_status()
+            return [{"name": m["id"]} for m in resp.json().get("data", []) if m.get("id")]
+        except (httpx.HTTPError, ValueError, KeyError):
+            logger.warning("Failed to list models from %s", self.api_base, exc_info=True)
+            return []
+
+    async def get_model_capabilities(self, model_name: str) -> list[str] | None:
+        return None  # not exposed by the OpenAI API
+
+    async def list_models_by_capability(self) -> dict[str, list[str]]:
+        names = [m["name"] for m in await self.list_models()]
+        return {"vision": names, "text": names, "all": names}
+
+    async def pull_model_stream(self, model_name: str):
+        import json as _json
+        yield _json.dumps({"error": "Pulling models is only available with Ollama. "
+                                    "Load the model on your OpenAI-compatible server instead."}) + "\n"
+
+    async def _generate(
+        self,
+        model: str,
+        prompt: str,
+        images: list[str] | None = None,
+        options: dict | None = None,
+    ) -> str:
+        content: Any = prompt
+        if images:
+            content = [{"type": "text", "text": prompt}] + [
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}} for b64 in images
+            ]
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": [{"role": "user", "content": content}],
+            "stream": False,
+        }
+        options = options or {}
+        if "temperature" in options:
+            payload["temperature"] = options["temperature"]
+        if options.get("num_predict"):
+            payload["max_tokens"] = options["num_predict"]
+        if self.disable_thinking:
+            # Halogen / OpenAI-style servers take reasoning_effort; llama.cpp / vLLM
+            # Qwen-style templates take chat_template_kwargs.enable_thinking.
+            payload["reasoning_effort"] = "none"
+            payload["chat_template_kwargs"] = {"enable_thinking": False}
+
+        try:
+            resp = await self._client.post(
+                f"{self.api_base}/chat/completions",
+                json=payload,
+                timeout=_GENERATE_TIMEOUT,
+            )
+        except httpx.TimeoutException:
+            raise RuntimeError(
+                f"AI server timed out after {int(_GENERATE_TIMEOUT)}s — "
+                "the model may still be loading or the GPU may be busy"
+            )
+        except httpx.HTTPError as exc:
+            raise RuntimeError(f"AI server connection error: {exc.__class__.__name__}: {exc}")
+        if resp.status_code >= 400:
+            try:
+                err = resp.json().get("error", "")
+                detail = (err.get("message") if isinstance(err, dict) else err) or resp.text[:300]
+            except Exception:
+                detail = resp.text[:300]
+            raise RuntimeError(f"AI server error ({resp.status_code}): {detail}")
+        message = resp.json()["choices"][0]["message"]
+        text = message.get("content") or ""
+        # Some servers inline the reasoning; keep only the answer.
+        return re.sub(r"(?s)<think>.*?</think>", "", text).strip()
+
+
+def make_ai_client(settings: Any) -> OllamaClient:
+    """Build the client for the configured server flavour (settings.ai_api)."""
+    if getattr(settings, "ai_api", "ollama") == "openai":
+        return OpenAICompatClient(
+            host=settings.ollama_host,
+            vision_model=settings.vision_model,
+            llm_model=settings.llm_model,
+            api_key=getattr(settings, "ai_api_key", ""),
+            disable_thinking=getattr(settings, "ai_disable_thinking", True),
+        )
+    return OllamaClient(
+        host=settings.ollama_host,
+        vision_model=settings.vision_model,
+        llm_model=settings.llm_model,
+    )
+
+
 # -- Helpers -----------------------------------------------------------------
 
 

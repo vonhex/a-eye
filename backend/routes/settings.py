@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from backend.config import update_settings as config_update_settings, get_settings
-from backend.ollama_client import OllamaClient
+from backend.ollama_client import make_ai_client
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,7 @@ _MUTABLE_SETTINGS = {
     "max_filename_len", "filename_case", "use_exif_date", "use_gps",
     "gps_detail", "concurrent_workers", "watch_mode",
     "vision_model", "llm_model", "output_language", "ollama_host", "process_subdirs",
+    "ai_api", "ai_api_key", "ai_disable_thinking",
     "thumbnail_max_size", "thumbnail_quality", "thumbnail_retain_days",
     "dry_run",
     "excluded_folders",
@@ -34,7 +35,7 @@ _MUTABLE_SETTINGS = {
 }
 
 # Keys that require recreating the Ollama client
-_OLLAMA_KEYS = {"ollama_host", "vision_model", "llm_model"}
+_OLLAMA_KEYS = {"ollama_host", "vision_model", "llm_model", "ai_api", "ai_api_key", "ai_disable_thinking"}
 
 
 class SettingsUpdate(BaseModel):
@@ -47,7 +48,7 @@ async def get_settings_route(request: Request):
     settings = request.app.state.settings
 
     # Keys to redact from GET response (write-only)
-    _REDACTED = {"basic_auth_pass"}
+    _REDACTED = {"basic_auth_pass", "ai_api_key"}
 
     current = {}
     for key in _MUTABLE_SETTINGS:
@@ -66,8 +67,9 @@ async def _apply_settings_update(request: Request, body: SettingsUpdate):
 
     # Filter to only mutable keys; ignore redacted placeholder values
     updates = {k: v for k, v in body.settings.items() if k in _MUTABLE_SETTINGS}
-    if updates.get("basic_auth_pass") == "********":
-        del updates["basic_auth_pass"]
+    for secret in ("basic_auth_pass", "ai_api_key"):
+        if updates.get(secret) == "********":
+            del updates[secret]
     if not updates:
         return {"updated": []}
 
@@ -102,11 +104,7 @@ async def _apply_settings_update(request: Request, body: SettingsUpdate):
     # Recreate Ollama client if connection settings changed
     if ollama_changed:
         old_ollama = request.app.state.ollama
-        new_ollama = OllamaClient(
-            host=new_settings.ollama_host,
-            vision_model=new_settings.vision_model,
-            llm_model=new_settings.llm_model,
-        )
+        new_ollama = make_ai_client(new_settings)
         # Carry over prompt templates from the old client
         new_ollama.set_templates(old_ollama._vision_template, old_ollama._context_template)
         request.app.state.ollama = new_ollama

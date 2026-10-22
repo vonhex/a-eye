@@ -21,7 +21,7 @@ pillow_heif.register_heif_opener()
 
 from backend.config import get_settings
 from backend.database import init_db, recover_stuck_images, get_pending_image_ids, get_image, get_outcome_stats, get_stats, list_images, get_rename_history, count_images, count_rename_history
-from backend.ollama_client import OllamaClient
+from backend.ollama_client import make_ai_client
 from backend.prompts import ensure_defaults, get_active_prompt, STAGE_VISION, STAGE_CONTEXT
 from backend.routes import create_api_router
 from backend.scheduler import Scheduler
@@ -71,11 +71,7 @@ async def lifespan(app: FastAPI):
     context_prompt = await get_active_prompt(db, STAGE_CONTEXT)
 
     # Ollama client
-    ollama = OllamaClient(
-        host=settings.ollama_host,
-        vision_model=settings.vision_model,
-        llm_model=settings.llm_model,
-    )
+    ollama = make_ai_client(settings)
     ollama.set_templates(
         vision_prompt["content"] if vision_prompt else "",
         context_prompt["content"] if context_prompt else "",

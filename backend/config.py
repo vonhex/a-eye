@@ -20,6 +20,11 @@ _settings: Settings | None = None
 class Settings(BaseSettings):
     # -- Ollama Connection --
     ollama_host: str = "http://localhost:11434"
+    # API flavour of the server at ollama_host: "ollama" (native /api/*) or "openai"
+    # (any OpenAI-compatible server: Halogen, llama.cpp, vLLM, LM Studio... at <host>/v1).
+    ai_api: str = "ollama"
+    ai_api_key: str = ""  # Bearer token for OpenAI-compatible servers that require one
+    ai_disable_thinking: bool = True  # Ask reasoning models to answer without a thinking phase
 
     # -- Model Selection --
     vision_model: str = "minicpm-v"
@@ -96,6 +101,15 @@ class Settings(BaseSettings):
         v = str(v).strip().rstrip("/")
         if v and not v.startswith(("http://", "https://")):
             v = "http://" + v
+        return v
+
+    @field_validator("ai_api", mode="before")
+    @classmethod
+    def _validate_ai_api(cls, v: str) -> str:
+        v = str(v).strip().lower()
+        if v not in {"ollama", "openai"}:
+            logger.warning("Invalid ai_api '%s', defaulting to 'ollama'", v)
+            return "ollama"
         return v
 
     @field_validator("rename_mode", mode="before")

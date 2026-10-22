@@ -20,9 +20,17 @@
         <div class="settings-section-grid settings-grid-2col">
             <!-- Ollama Connection -->
             <div class="settings-group">
-                <h3>Ollama Connection</h3>
+                <h3>AI Server Connection</h3>
                 <div class="form-group">
-                    <label for="ollama_host">Ollama Host URL</label>
+                    <label for="ai_api">Server Type</label>
+                    <select id="ai_api">
+                        <option value="ollama" {% if settings.ai_api != 'openai' %}selected{% endif %}>Ollama</option>
+                        <option value="openai" {% if settings.ai_api == 'openai' %}selected{% endif %}>OpenAI-compatible (Halogen, llama.cpp, vLLM, LM Studio)</option>
+                    </select>
+                    <small>After changing the server type or URL, save settings before loading models.</small>
+                </div>
+                <div class="form-group">
+                    <label for="ollama_host">Server URL</label>
                     <div class="input-with-button">
                         <input type="text" id="ollama_host" value="{{ settings.ollama_host }}">
                         <button class="btn btn-sm" id="test-connection-btn" onclick="loadModels()">
@@ -30,6 +38,19 @@
                         </button>
                     </div>
                     <div id="connection-result"></div>
+                    <small>Ollama: e.g. http://192.168.1.100:11434 &middot; OpenAI-compatible: e.g. http://192.168.1.103:8731 (with or without /v1)</small>
+                </div>
+                <div class="form-group">
+                    <label for="ai_api_key">API Key (OpenAI-compatible servers, optional)</label>
+                    <input type="password" id="ai_api_key" autocomplete="off"
+                           placeholder="{% if settings.ai_api_key %}******** (saved, leave blank to keep){% else %}Leave blank if the server needs none{% endif %}">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="ai_disable_thinking" {% if settings.ai_disable_thinking %}checked{% endif %}>
+                        Disable thinking (reasoning models)
+                    </label>
+                    <small>Asks reasoning models such as Qwen to answer directly without a thinking phase. Much faster tagging. Applies to OpenAI-compatible servers.</small>
                 </div>
                 <div class="form-group">
                     <label for="vision_model">Vision Model (required)</label>
