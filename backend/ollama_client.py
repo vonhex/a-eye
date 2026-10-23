@@ -467,7 +467,8 @@ def _parse_response(raw: str) -> dict[str, Any]:
             filename = line.split(":", 1)[1].strip()
         elif upper.startswith("TAGS:"):
             tags_raw = line.split(":", 1)[1].strip()
-            tags = [t.strip().lower() for t in tags_raw.split(",") if t.strip()]
+            # dict.fromkeys drops repeats ("night, city, night") but keeps the model's order.
+            tags = list(dict.fromkeys(t.strip().lower() for t in tags_raw.split(",") if t.strip()))
         elif upper.startswith("QUALITY:"):
             quality_raw = line.split(":", 1)[1].strip().lower()
             if quality_raw and not _quality_is_ok(quality_raw):
