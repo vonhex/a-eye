@@ -9,6 +9,14 @@
   Uses local vision models to understand, describe, tag, rename, and search your photos — no cloud needed, everything runs on your own hardware.
 </p>
 
+> [!NOTE]
+> **This is vonhex's fork of [SpaceinvaderOne/a-eye](https://github.com/SpaceinvaderOne/a-eye).** It fixes bugs found in the original and adds:
+> - **OpenAI-compatible AI servers** (Halogen, llama.cpp, vLLM, LM Studio) besides Ollama, with an option to turn off model thinking for much faster tagging
+> - **[Eyeris](https://github.com/vonhex/Eyeris) integration**: endpoints that let the Eyeris photo manager send photos, video thumbnails and faces for analysis and look up results (see [Eyeris integration](#eyeris-integration))
+> - Security hardening: salted session keys, path confinement and tighter error handling
+>
+> Image: `ghcr.io/vonhex/a-eye:latest` (or a release tag such as `ghcr.io/vonhex/a-eye:1.0`). Unraid template: [vonhex/unraid-templates](https://github.com/vonhex/unraid-templates).
+
 <p align="center">
   <img src="screenshots/dashboard.png" alt="Dashboard" width="45%">
   <img src="screenshots/search.png" alt="Search" width="45%">
@@ -69,10 +77,10 @@ Save, then **Load Models** and pick the served model as the vision model. The sa
 
 ## Installation — Unraid
 
-1. Go to **Community Applications** in Unraid
-2. Search for **A-Eye**
-3. Click **Install** — the template has fields for:
-   - **Ollama Host** — the URL of your Ollama instance
+1. In Unraid's **Docker** tab, open **Template Repositories** and add `https://github.com/vonhex/unraid-templates`, then save
+2. Click **Add Container** and pick **A-Eye** from the template list
+3. Fill in the template — it has fields for:
+   - **Ollama Host** — the URL of your AI server (Ollama, or an OpenAI-compatible server with **AI API** set to `openai`)
    - **Photos Directory** — path to your photo library on Unraid
    - **Web UI Port** — defaults to 8000
 4. Set the **Ollama Host URL** to wherever Ollama is running (e.g. `http://192.168.1.100:11434`)
@@ -87,7 +95,7 @@ Clone the repo or create a `docker-compose.yml`:
 ```yaml
 services:
   a-eye:
-    image: spaceinvaderone/a-eye
+    image: ghcr.io/vonhex/a-eye:latest
     container_name: a-eye
     ports:
       - "8000:8000"
@@ -230,6 +238,20 @@ A-Eye is designed for home lab and LAN deployments. Here's what's in place:
 
 If you're exposing A-Eye through a reverse proxy, use your proxy's built-in rate limiting and TLS termination.
 
+## Eyeris integration
+
+[Eyeris](https://github.com/vonhex/Eyeris) is a photo manager that hands AI work to A-Eye. It uses these endpoints, which require the A-Eye login when authentication is on:
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/analyze-path` | Queue a photo in A-Eye's own pipeline by its path under the photos directory |
+| `POST /api/analyze-image` | Analyze uploaded image bytes (for example a video thumbnail) and return the description, tags and quality flags directly; nothing is stored |
+| `POST /api/analyze-faces` | Describe each person in an uploaded image |
+| `GET /api/images/by-path/{path}` | Look up A-Eye's results for a photo by path |
+| `GET /api/images/by-hash/{hash}` | Look up A-Eye's results for a photo by file hash (404 if A-Eye has not seen it) |
+
+In Eyeris, set the A-Eye URL, username and password under **Settings → Integrations**.
+
 ## Configuration Reference
 
 All settings are configurable through the web UI. They can also be set via environment variables for initial container setup — once you save settings in the UI, those values take priority.
@@ -238,7 +260,10 @@ All settings are configurable through the web UI. They can also be set via envir
 
 | Setting | Env Var | Default | Description |
 |---------|---------|---------|-------------|
-| Ollama Host | `OLLAMA_HOST` | `http://localhost:11434` | URL of the Ollama instance |
+| Ollama Host | `OLLAMA_HOST` | `http://localhost:11434` | URL of the AI server (Ollama, or an OpenAI-compatible server) |
+| Server Type | `AI_API` | `ollama` | `ollama` for the native Ollama API, `openai` for any OpenAI-compatible server |
+| API Key | `AI_API_KEY` | *(empty)* | Bearer token for OpenAI-compatible servers that require one |
+| Disable Thinking | `AI_DISABLE_THINKING` | `true` | Ask reasoning models to answer without a thinking phase |
 | Vision Model | `VISION_MODEL` | `minicpm-v` | Ollama vision model for photo analysis |
 | LLM Model | `LLM_MODEL` | *(empty)* | Optional text model for natural language search |
 | Output Language | `OUTPUT_LANGUAGE` | *(empty)* | Language for AI descriptions and tags. Leave blank for English |
